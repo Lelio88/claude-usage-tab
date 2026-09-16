@@ -226,17 +226,27 @@ class SettingsDialog(Gtk.Window):
         )
 
     def _on_toggle_hooks(self, _btn: Gtk.Button) -> None:
-        if attention_hooks.installed():
-            result = attention_hooks.uninstall()
-        else:
+        installing = not attention_hooks.installed()
+        if installing:
             if not self._confirm(
                 t("dlg_att_hooks_confirm_title"), t("dlg_att_hooks_confirm_body")
             ):
                 return
             result = attention_hooks.install()
+        else:
+            result = attention_hooks.uninstall()
+        self._refresh_hook_row()
         if not result.ok:
             self._error(t("dlg_att_section"), t("dlg_att_hooks_failed", err=result.detail))
-        self._refresh_hook_row()
+            return
+        if installing:
+            test = attention_hooks.selftest()
+            if test.ok:
+                self._info(t("dlg_att_section"), t("dlg_att_hooks_ok"))
+            else:
+                self._error(
+                    t("dlg_att_section"), t("dlg_att_hooks_failed", err=test.detail)
+                )
 
     # ------------------------------------------------------------- tab: top-bar
 
@@ -688,6 +698,18 @@ class SettingsDialog(Gtk.Window):
             transient_for=self,
             modal=True,
             message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=title,
+        )
+        dlg.format_secondary_text(detail)
+        dlg.run()
+        dlg.destroy()
+
+    def _info(self, title: str, detail: str) -> None:
+        dlg = Gtk.MessageDialog(
+            transient_for=self,
+            modal=True,
+            message_type=Gtk.MessageType.INFO,
             buttons=Gtk.ButtonsType.OK,
             text=title,
         )
