@@ -162,7 +162,9 @@ named ``claude`` (the native installer drops ``claude.exe`` in
 never when it is one of ours. ``pick_offer`` holds the policy: at
 ``LIMIT_UTIL`` (100%) on the five-hour window, offer the stored account with
 the most room, and only if it is under ``ROOM_UTIL`` (90%) — an account
-already at 92% buys minutes, not an afternoon. The offer surfaces as a
+already at 92% buys minutes, not an afternoon — **and** its weekly window is
+under ``LIMIT_UTIL``: a full weekly cap blocks an account at 0% session just
+the same. The offer surfaces as a
 notification plus a row at the top of the menu, once per limit episode.
 
 The follow-the-file behaviour is **undocumented**, exactly like the usage

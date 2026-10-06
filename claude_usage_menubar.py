@@ -478,11 +478,14 @@ class ClaudeUsageApp(rumps.App):
         data = (claude_state or {}).get("data") or {}
         active_util = to_float((data.get("five_hour") or {}).get("utilization"))
         candidates = [
-            (
-                st["acct"].id,
-                st["acct"].email or st["acct"].label,
-                to_float(
-                    ((st.get("data") or {}).get("five_hour") or {}).get("utilization")
+            handoff.Candidate(
+                account_id=st["acct"].id,
+                email=st["acct"].email or st["acct"].label,
+                session_util=to_float(
+                    (st["data"].get("five_hour") or {}).get("utilization")
+                ),
+                weekly_util=to_float(
+                    (st["data"].get("seven_day") or {}).get("utilization")
                 ),
             )
             for st in self.account_states

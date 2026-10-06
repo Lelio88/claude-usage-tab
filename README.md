@@ -426,7 +426,8 @@ between them.
 You hit the 5 h limit mid-task and your other account still has room.
 
 **The app offers it.** At 100 % on the 5 h window, if another stored account
-is below 90 %, you get a notification and a row at the top of the menu:
+is below 90 % on its own 5 h window and hasn't hit its weekly limit, you get
+a notification and a row at the top of the menu:
 *Limit reached — switch to …*. One click and it's done. No digging through
 submenus at the moment you're blocked.
 

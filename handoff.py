@@ -60,6 +60,9 @@ _CREATE_NO_WINDOW = 0x08000000
 # When to offer a handoff, and what counts as somewhere worth going. An
 # account already at 90% would buy minutes, not an afternoon, so it is not
 # offered — the user can still switch to it by hand from the accounts menu.
+# An account whose *weekly* window is full is not somewhere to go either,
+# however empty its five-hour window looks: the weekly cap blocks it just the
+# same, and for days rather than hours.
 LIMIT_UTIL = 100.0
 ROOM_UTIL = 90.0
 
@@ -81,24 +84,43 @@ class Offer:
     util: float
 
 
+@dataclass(frozen=True)
+class Candidate:
+    """Another stored account, as the caller last polled it.
+
+    Named fields rather than a tuple: two utilisations side by side are
+    exactly what a positional tuple lets you swap without noticing.
+    """
+
+    account_id: str
+    email: str
+    session_util: float
+    weekly_util: float = 0.0
+
+
 def pick_offer(
     active_util: float,
-    candidates: "list[tuple[str, str, float]]",
+    candidates: "list[Candidate]",
 ) -> Offer | None:
     """Choose where to send the user when the active account runs dry.
 
-    ``candidates`` are ``(account_id, email, five-hour utilisation)`` for the
-    *other* stored accounts, already polled by the caller — this module does
-    no network of its own. Pure and side-effect free so all three front-ends
-    apply one policy instead of three.
+    ``candidates`` are the *other* stored accounts, already polled by the
+    caller — this module does no network of its own. A missing weekly figure
+    reads as 0 (``to_float``'s default), so an account is only ruled out on
+    a weekly limit it actually reported. Pure and side-effect free so all
+    three front-ends apply one policy instead of three.
     """
     if active_util < LIMIT_UTIL:
         return None
-    usable = [c for c in candidates if c[2] < ROOM_UTIL]
+    usable = [
+        c
+        for c in candidates
+        if c.session_util < ROOM_UTIL and c.weekly_util < LIMIT_UTIL
+    ]
     if not usable:
         return None
-    account_id, email, util = min(usable, key=lambda c: c[2])
-    return Offer(account_id=account_id, email=email, util=util)
+    best = min(usable, key=lambda c: c.session_util)
+    return Offer(account_id=best.account_id, email=best.email, util=best.session_util)
 
 
 # --------------------------------------------------------------- process probe
