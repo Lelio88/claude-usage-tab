@@ -418,8 +418,8 @@ between them.
   app swaps only the credential blocks (backing up `~/.claude.json`
   first) and leaves everything else alone.
 
-> Switching takes effect on the **next** `claude` launch — a running
-> session won't switch mid-flight.
+> A switch also moves the `claude` sessions you already have open, not just
+> the next one you start — see below.
 
 ### Switch and carry on
 
