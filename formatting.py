@@ -135,6 +135,22 @@ def format_stamp(ts: float) -> str:
     return datetime.fromtimestamp(ts).strftime(t("date_format"))
 
 
+def format_delay(minutes: int) -> str:
+    """Menu label for one of ``standby.DELAY_PRESETS`` — ``In 30 min`` / ``In 2 h``."""
+    if minutes >= 60 and minutes % 60 == 0:
+        return t("sb_in_hours", h=minutes // 60)
+    return t("sb_in_minutes", m=minutes)
+
+
+def format_clock(ts: float, seconds: bool = False) -> str:
+    """Local time of day for a unix timestamp — ``23:45``, or ``23:45:30``.
+
+    No date on purpose: the standby delays top out at a few hours, so the
+    next occurrence of that time is the only one it can mean.
+    """
+    return datetime.fromtimestamp(ts).strftime("%H:%M:%S" if seconds else "%H:%M")
+
+
 def fmt_secs(secs: int) -> str:
     """Short duration for a rate-limit countdown."""
     if secs >= 3600:

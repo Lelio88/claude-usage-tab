@@ -27,7 +27,8 @@ claude_usage_tray.py         # Windows: pystray tray app (same engine)
 topbar.py                    # top-bar label composition (settings-driven)
 formatting.py                # shared pure render helpers (durations, bars, to_float)
 sound.py                     # shared 80%-session flourish engine (audio + image, all 3)
-attention.py                 # Claude Code hook + flag store: which terminals want you back
+attention.py                 # Claude Code hook + flag store: which terminals want you back (+ turn store)
+standby.py                   # sleep once every Claude turn has ended, or after a delay
 attention_hooks.py           # registers those hooks in ~/.claude/settings.json (2nd write surface)
 handoff.py                   # running-session probe + when a switch is worth offering
 trayicon.py                  # Windows: percentage badge / logo images (Pillow only)
@@ -70,7 +71,9 @@ No package, no build. Sibling modules importing each other directly —
 + ``formatting``; ``settings_dialog`` depends on ``settings`` + ``topbar`` +
 ``costs`` + ``updates`` + ``strings`` (and GTK); ``trayicon`` depends on
 Pillow alone and ``winshell`` on the stdlib alone (both import cleanly off
-Windows, so they stay testable anywhere); each front-end imports the rest.
+Windows, so they stay testable anywhere); ``standby`` is a stdlib leaf that
+reaches ``winshell.suspend`` lazily, on Windows only; each front-end imports
+the rest.
 
 Every read of a value from the usage payload goes through
 ``formatting.to_float`` — it is the one place that turns a string, a null, a
@@ -140,6 +143,42 @@ deadline on Windows, self-rescheduling ``GLib`` source on GNOME, fixed-beat
 instant a turn ends and two minutes of latency would defeat the point.
 One shell caveat worth remembering: **an icon parked in the notification
 area's overflow chevron cannot be seen blinking.**
+
+Sleep when done (``standby.py``): put the machine to sleep once **every**
+running Claude turn has ended, or N minutes from now (``DELAY_PRESETS``).
+"Every", not "the next one": the short job must not cut the long one off.
+It needs the attention hooks registered, not the blink. Turns live in a
+second store next to the flags (``attention.turns``), because a flag means
+"come back" and a turn means "still working" — a permission prompt is both.
+A turn opens on ``UserPromptSubmit`` **and** ``PostToolUse`` (a background
+subagent keeps working after its parent's ``Stop``, and its tool calls carry
+the parent's session id), closes on ``Stop`` / ``SessionEnd``, and goes stale
+after ``TURN_STALE_MINUTES`` (30) with no hook at all — ``Stop`` never fires
+on an Esc interrupt. Leftover turns only make the machine sleep *later*; the
+two ways it can sleep *earlier* are deliberate and must stay the only ones —
+that 30-minute cut-off (a single very long tool call, an unanswered
+permission prompt), and the user forgetting a turn from the menu, **one
+terminal at a time**, with its silence printed next to it. A turn store
+that exists but cannot be listed raises instead of reading as "all
+finished". ``standby.advance`` is a pure state machine; the front-end owns
+the 1 s beat (its own deadline, not the blink's), the toasts and the menu.
+Three rules it keeps: a ``GRACE_SECONDS`` (60) countdown, cancellable from a
+top-level menu row, before every sleep — and queued clicks are drained
+before each beat, so a Cancel made while the worker was stuck lands before
+the deadline check; the plan is disarmed **before** ``suspend()`` is called
+(``SetSuspendState`` may only return after resume); and a machine that slept
+some other way, even mid-countdown, cancels the plan instead of sleeping
+again under someone who just woke it. That last one compares the wall clock
+with ``standby.awake_clock`` (``QueryUnbiasedInterruptTime`` on Windows,
+``time.monotonic`` elsewhere), which stops while the machine sleeps — a
+merely busy worker moves both clocks alike and must never cancel anything.
+On Windows, ``SetSuspendState`` is called directly
+with ``bHibernate=False`` — the ``rundll32 powrprof.dll,SetSuspendState``
+one-liner hibernates on any machine where hibernation is on. Only Windows is
+wired (``WINDOWS_READY``); the GNOME and macOS commands exist but stay
+hidden until they have run on a real machine. Known gap: a turn that ends
+while a ``run_in_background`` Bash command is still running reads as
+finished.
 
 Account handoff (``handoff.py``): **a running ``claude`` session follows the
 credentials file.** This was assumed to be false for a long time, including
@@ -222,6 +261,7 @@ Runtime files (never committed):
 - ``~/.config/claude-usage-indicator/accounts/<id>.json`` — per-account credential blob, ``0600``
 - ``~/.cache/claude-usage-indicator/costs.json`` — per-day API cost amounts (``(date, amount)`` only)
 - ``~/.cache/claude-usage-indicator/attention/<session>.json`` — one flag per waiting terminal (``kind``, ``ts``, folder name)
+- ``~/.cache/claude-usage-indicator/turns/<session>.json`` — one per running turn (``ts``, folder name)
 - ``~/.claude.json.cusi-bak`` — backup written before a switch rewrites ``~/.claude.json``
 - ``~/.claude/settings.json.cusi-bak`` — backup written before the attention hooks are merged in
 - ``%LOCALAPPDATA%/claude-usage-indicator/tray.log`` — Windows only, stderr when there's no console (capped at 1 MB)
@@ -324,11 +364,18 @@ react:
 ```bash
 echo '{"hook_event_name":"Stop","session_id":"probe","cwd":"/tmp/demo"}' \
   | python3 attention.py hook
-python3 attention.py status          # {"waiting": 0, "done": 1, ...}
+python3 attention.py status          # {"waiting": 0, "done": 1, ..., "running": [...]}
 python3 attention.py clear
 python3 attention_hooks.py status    # is it registered, and with which command?
 python3 attention_hooks.py selftest  # run the real command through the shell
 ```
+
+Sleep-when-done is exercised the same way, without ever sleeping: replace
+``standby.suspend`` (and ``winshell.suspend``, belt and braces) with a stub
+*before* building ``TrayApp`` under a fake ``USERPROFILE``/``HOME``, feed
+``UserPromptSubmit`` / ``Stop`` payloads to ``attention.handle_event``, and
+call ``app._standby_step()``. A probe that reaches the real call puts the
+machine running it to sleep.
 
 The handoff module is equally inspectable from a shell, and worth checking
 on any machine where the switch misbehaves:

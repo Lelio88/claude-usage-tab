@@ -255,6 +255,135 @@ def choose_file(title: str, spec: tuple[str, str]) -> str | None:
     return buf.value or None
 
 
+# ----------------------------------------------------------------------- power
+
+_TOKEN_ADJUST_PRIVILEGES = 0x0020
+_TOKEN_QUERY = 0x0008
+_SE_PRIVILEGE_ENABLED = 0x00000002
+
+
+class _LUID(ctypes.Structure):
+    _fields_ = [("LowPart", ctypes.c_uint32), ("HighPart", ctypes.c_int32)]
+
+
+class _TOKEN_PRIVILEGES(ctypes.Structure):
+    """``TOKEN_PRIVILEGES`` with its one-element array flattened in place."""
+
+    _fields_ = [
+        ("PrivilegeCount", ctypes.c_uint32),
+        ("Luid", _LUID),
+        ("Attributes", ctypes.c_uint32),
+    ]
+
+
+def _enable_shutdown_privilege() -> bool:
+    """Switch ``SeShutdownPrivilege`` on for this process.
+
+    Every interactive user holds it, disabled, and ``SetSuspendState``
+    documents it as required. Private ``WinDLL`` handles rather than
+    ``ctypes.windll``: setting ``argtypes`` on the shared ones would change
+    them under pystray's feet too. The prototypes matter on 64-bit — without
+    them the ``GetCurrentProcess`` pseudo-handle is truncated to 32 bits.
+    """
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32")
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi.OpenProcessToken.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.HANDLE),
+    ]
+    advapi.LookupPrivilegeValueW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        ctypes.POINTER(_LUID),
+    ]
+    advapi.AdjustTokenPrivileges.argtypes = [
+        wintypes.HANDLE,
+        wintypes.BOOL,
+        ctypes.POINTER(_TOKEN_PRIVILEGES),
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    ]
+
+    token = wintypes.HANDLE()
+    if not advapi.OpenProcessToken(
+        kernel.GetCurrentProcess(),
+        _TOKEN_ADJUST_PRIVILEGES | _TOKEN_QUERY,
+        ctypes.byref(token),
+    ):
+        return False
+    try:
+        luid = _LUID()
+        if not advapi.LookupPrivilegeValueW(
+            None, "SeShutdownPrivilege", ctypes.byref(luid)
+        ):
+            return False
+        privileges = _TOKEN_PRIVILEGES(1, luid, _SE_PRIVILEGE_ENABLED)
+        if not advapi.AdjustTokenPrivileges(
+            token, False, ctypes.byref(privileges), 0, None, None
+        ):
+            return False
+        # Success with ERROR_NOT_ALL_ASSIGNED means the account lacks it.
+        return ctypes.get_last_error() == 0
+    finally:
+        kernel.CloseHandle(token)
+
+
+def suspend() -> bool:
+    """Put the machine to sleep — never into hibernation. Never raises.
+
+    ``rundll32 powrprof.dll,SetSuspendState 0,1,0`` is the one-liner every
+    forum hands out, and it is wrong: rundll32 does not pass those numbers as
+    the function's ``BOOLEAN`` arguments, so on a machine with hibernation
+    enabled it hibernates. Calling ``SetSuspendState`` directly with
+    ``bHibernate=False`` asks for plain sleep. ``False`` means Windows
+    refused — a firmware with no sleep state it will enter this way, a group
+    policy. On success the call may not return until the machine wakes, so
+    the caller must have disarmed itself *before* calling.
+    """
+    if not is_windows():
+        return False
+    try:
+        from ctypes import wintypes
+
+        _enable_shutdown_privilege()
+        powrprof = ctypes.WinDLL("powrprof")
+        powrprof.SetSuspendState.argtypes = [
+            wintypes.BOOLEAN,
+            wintypes.BOOLEAN,
+            wintypes.BOOLEAN,
+        ]
+        powrprof.SetSuspendState.restype = wintypes.BOOLEAN
+        return bool(powrprof.SetSuspendState(False, False, False))
+    except (AttributeError, OSError, ctypes.ArgumentError):
+        return False
+
+
+def awake_seconds() -> float | None:
+    """Seconds since boot with every sleep and hibernation left out.
+
+    ``QueryUnbiasedInterruptTime`` is documented to stop while the machine
+    sleeps, which is the whole point: set against the wall clock, it tells a
+    machine that slept apart from a process that was merely busy. ``None``
+    when it cannot be read — the caller falls back to ``time.monotonic``.
+    """
+    if not is_windows():
+        return None
+    try:
+        kernel = ctypes.WinDLL("kernel32")
+        ticks = ctypes.c_ulonglong()
+        if not kernel.QueryUnbiasedInterruptTime(ctypes.byref(ticks)):
+            return None
+    except (AttributeError, OSError, ctypes.ArgumentError):
+        return None
+    return ticks.value / 10_000_000  # 100-nanosecond units
+
+
 # ------------------------------------------------------------------- autostart
 
 

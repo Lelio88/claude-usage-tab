@@ -397,6 +397,47 @@ want to silence them all.
 
 ---
 
+## Sleep when done *(Windows)*
+
+Start a long job, walk away, and let the PC go to sleep on its own once it
+is finished instead of idling all night. The **Sleep** submenu offers two
+one-shot triggers:
+
+- **When the Claude terminals are done** — waits until *every* terminal that
+  is working has finished its turn, so a short job never cuts a long one
+  off. Arming it before launching the job works too: it waits for a turn to
+  start first. Needs the Claude Code hooks from
+  [Terminal attention](#terminal-attention) (the blink itself can stay off).
+- **In 30 min / 1 h / 2 h / 4 h** — whatever the terminals are doing.
+
+Nothing happens abruptly. When the moment comes you get a notification and a
+60-second countdown, with a **Sleeping at … — cancel** row at the top of the
+menu. If a terminal starts working again during the countdown, sleep is put
+off until it is done. Once the PC has slept, the plan is spent — waking it
+up won't send it back to sleep. While armed, the tooltip says so and the
+submenu lists the terminals it is still waiting for.
+
+**Good to know**
+
+- It is real sleep, not hibernation.
+- *Done* means Claude ended its turn. A turn that ends on a question for you
+  counts as done; a turn waiting on a permission prompt counts as still
+  working.
+- A command Claude left running **in the background** isn't seen: if the
+  turn ends while it runs, the PC can go to sleep under it.
+- A terminal interrupted with Esc never reports that its turn ended, so it
+  holds sleep back for up to 30 minutes. The submenu shows how long each
+  terminal has been silent; **Forget this terminal** on that one row lets
+  sleep go ahead. If it was still working after all, it reappears on its
+  next tool call.
+- A turn silent for 30 minutes straight counts as done — one very long
+  command, or a permission prompt nobody is there to answer.
+- If the PC sleeps some other way while a plan is armed (lid, power button,
+  even in the middle of the countdown), the plan is cancelled with a
+  notification rather than resumed on wake.
+
+---
+
 ## Multiple accounts
 
 Claude Code only stores **one** active account at a time — signing in as
@@ -527,6 +568,7 @@ sound.py                    # 80% flourish, all three platforms
 attention.py                # Claude Code hook + flag store (terminal attention)
 attention_hooks.py          # registers those hooks in ~/.claude/settings.json
 handoff.py                  # running-session probe + when to offer a switch
+standby.py                  # sleep once Claude is done, or after a delay
 trayicon.py                 # Windows: draws the percentage badge (Pillow)
 winshell.py                 # Windows: dialogs, autostart, launching (ctypes)
 install.sh / update.sh / uninstall.sh                  # Linux
