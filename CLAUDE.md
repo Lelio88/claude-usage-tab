@@ -174,9 +174,12 @@ with ``standby.awake_clock`` (``QueryUnbiasedInterruptTime`` on Windows,
 merely busy worker moves both clocks alike and must never cancel anything.
 On Windows, ``SetSuspendState`` is called directly
 with ``bHibernate=False`` — the ``rundll32 powrprof.dll,SetSuspendState``
-one-liner hibernates on any machine where hibernation is on. Only Windows is
-wired (``WINDOWS_READY``); the GNOME and macOS commands exist but stay
-hidden until they have run on a real machine. Known gap: a turn that ends
+one-liner hibernates on any machine where hibernation is on. On GNOME it is
+``systemctl suspend`` (logind lets the active local session do it without a
+password), and the suspend itself runs from a ``PRIORITY_LOW`` idle so a
+Cancel queued behind a slow synchronous poll is dispatched first. Windows
+and GNOME are wired (``WINDOWS_READY`` / ``LINUX_READY``); the macOS command
+exists but stays hidden until it has run on a real Mac. Known gap: a turn that ends
 while a ``run_in_background`` Bash command is still running reads as
 finished.
 

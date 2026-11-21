@@ -114,7 +114,7 @@ Nothing under `~\.claude` (Claude Code's own credentials) is ever touched.
 | File picker | GTK | `osascript` | `GetOpenFileNameW` (ctypes) |
 | Autostart | `.desktop` in `~/.config/autostart` | LaunchAgent | `HKCU\...\Run` |
 | Sounds | ffplay/mpv/paplay… | `afplay` | `winsound` (WAV) / hidden PowerShell `MediaPlayer` (mp3) |
-| Sleep when done | not wired yet | not wired yet | `SetSuspendState` (ctypes), never hibernates |
+| Sleep when done | `systemctl suspend` | not wired yet | `SetSuspendState` (ctypes), never hibernates |
 | Python | system Python (no venv) | venv | venv |
 
 Everything else — polling, backoff on 429, multi-account switching, custom

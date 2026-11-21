@@ -368,7 +368,8 @@ Waiting always wins: it is the state that is actually blocking work.
 
 **Turning it on**
 
-1. Open **Options ▸ Claude terminals** (the settings window on Linux).
+1. Open **Options ▸ Claude terminals** — on Linux, **Settings… ▸ General ▸
+   Claude terminals**.
 2. Click **Install the Claude Code hooks**, and confirm.
 3. Tick **Blink when a terminal wants me**.
 
@@ -394,10 +395,14 @@ want to silence them all.
   project folder's name, never its path. A flag nothing cleared (a terminal
   killed outright) expires after an hour.
 - No hooks installed means no flags, which means no blink — never an error.
+- Claude Code reads its hooks when a session starts. Terminals already open
+  when you install them aren't seen — by the blink or by
+  [Sleep when done](#sleep-when-done-windows-linux-gnome) — until you restart
+  them.
 
 ---
 
-## Sleep when done *(Windows)*
+## Sleep when done *(Windows, Linux GNOME)*
 
 Start a long job, walk away, and let the PC go to sleep on its own once it
 is finished instead of idling all night. The **Sleep** submenu offers two
@@ -414,8 +419,8 @@ Nothing happens abruptly. When the moment comes you get a notification and a
 60-second countdown, with a **Sleeping at … — cancel** row at the top of the
 menu. If a terminal starts working again during the countdown, sleep is put
 off until it is done. Once the PC has slept, the plan is spent — waking it
-up won't send it back to sleep. While armed, the tooltip says so and the
-submenu lists the terminals it is still waiting for.
+up won't send it back to sleep. While armed, the tooltip (Windows) or the
+submenu's title (GNOME) says so, and the submenu lists the terminals it is still waiting for.
 
 **Good to know**
 

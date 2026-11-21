@@ -66,11 +66,12 @@ GRACE_SECONDS = 60
 # and a small forward NTP correction must not read as a sleep.
 SLEPT_SECONDS = 15
 
-# Platforms whose front-end path has actually run on a real machine, same
-# convention as ``costs.MACOS_READY``. The commands below exist for all three;
-# the menu only appears where they have been exercised.
+# Platforms whose front-end is wired, same convention as
+# ``costs.MACOS_READY``. The commands below exist for all three; the menu
+# only appears where the flag is on. Linux was switched on before its first
+# run on a real Ubuntu — the GTK path is the one to suspect if it misbehaves.
 WINDOWS_READY = True
-LINUX_READY = False
+LINUX_READY = True
 MACOS_READY = False
 
 SUSPEND_TIMEOUT = 15
